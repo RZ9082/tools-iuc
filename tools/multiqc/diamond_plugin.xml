@@ -1,9 +1,11 @@
 <macros>
     <token name="@DIAMOND_COMMAND@"><![CDATA[
+        #set $i = 0
         #for $file in $repeat.software_cond.input
-            @ESCAPE_IDENTIFIER@
-            #set file_path = os.path.join($software_dir, 'diamond.log')
-            ln -s '$file' '$file_path' &&
+            #set dir_path = os.path.join($software_dir, 'diamond_' + str($i))
+            mkdir -p '$dir_path' &&
+            ln -s '$file' '$dir_path/diamond.log' &&
+            #set $i = $i + 1
         #end for
     ]]></token>
     <xml name="diamond_form">
