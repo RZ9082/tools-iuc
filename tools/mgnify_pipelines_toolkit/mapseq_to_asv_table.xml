@@ -1,0 +1,57 @@
+<tool id="mgnify_pipelines_toolkit_mapseq_to_asv_table" name="MAPseq to ASV taxonomy table" version="@TOOL_VERSION@+galaxy@VERSION_SUFFIX@" profile="@PROFILE@">
+    <description>Convert MAPseq taxonomic assignments into a structured ASV taxonomy table</description>
+    <macros>
+        <import>macros.xml</import>
+    </macros>
+    <expand macro="creators"/>
+    <expand macro="requirements"/>
+    <command detect_errors="aggressive"><![CDATA[
+        #set input_basename = str($input.name).rsplit('.',1)[0]    
+        mapseq_to_asv_table -i '$input' -l '$label' -s '$input_basename' &&
+        mv '$input_basename'_*_asv_taxa.tsv '$output'
+    ]]></command>
+    <inputs>
+        <param name="input" type="data" label="MAPseq classification output" format="tabular"/>
+        <param argument="--label" type="select" label="Reference taxonomy schema" help="Taxonomy rank schema used by the reference database. Different databases use different rank hierarchies, for more information see help section below">
+            <option value="DADA2-SILVA">SILVA</option>
+            <option value="DADA2-PR2">PR2</option>
+        </param>
+    </inputs>    
+    <outputs>
+        <data name="output" label="${tool.name} on ${on_string}: ASV taxonomy table" format="tsv"/>
+    </outputs>
+    <tests>
+        <test expect_num_outputs="1">
+            <param name="input" value="test.mseq" ftype="tabular"/>
+            <param name="label" value="DADA2-SILVA"/>
+            <output name="output" file="sample_DADA2-SILVA_asv_taxa.tsv" ftype="tsv"/>
+        </test>
+        <test expect_num_outputs="1">
+            <param name="input" value="test.mseq" ftype="tabular"/>
+            <param name="label" value="DADA2-PR2"/>
+            <output name="output" file="sample_DADA2-PR2_asv_taxa.tsv" ftype="tsv"/>
+        </test>
+    </tests>
+    <help>
+<![CDATA[ 
+
+**Convert MAPseq Output to ASV Taxonomy Table**
+-----------------------------------------------
+
+This tool converts **MAPseq taxonomic classification output** into a structured **ASV taxonomy table** suitable for downstream microbial community analysis.
+
+**SILVA taxonomy schema**
+
+Superkingdom → Kingdom → Phylum → Class → Order → Family → Genus → Species
+
+**PR2 taxonomy schema**
+
+Domain → Supergroup → Division → Subdivision → Class → Order → Family → Genus → Species
+
+-----
+
+@LICENSE@
+]]>
+    </help>
+    <expand macro="citations" />
+</tool>

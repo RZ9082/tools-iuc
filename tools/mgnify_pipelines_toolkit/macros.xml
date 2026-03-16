@@ -1,0 +1,32 @@
+<macros>
+    <token name="@TOOL_VERSION@">1.4.19</token>
+    <token name="@VERSION_SUFFIX@">0</token>
+    <token name="@PROFILE@">25.0</token>
+    <token name="@LICENSE@"><![CDATA[
+License
+-------
+`Apache-2.0 license <https://raw.githubusercontent.com/EBI-Metagenomics/mgnify-pipelines-toolkit/refs/heads/main/LICENSE>`_]]></token>
+    <xml name="requirements">
+        <requirements>
+            <requirement type="package" version="@TOOL_VERSION@">mgnify-pipelines-toolkit</requirement>
+        </requirements>
+    </xml>
+    <xml name="creators">
+        <creator>
+            <person givenName="Rand" familyName="Zoabi" url="https://github.com/RZ9082" identifier="https://orcid.org/0009-0000-2501-8053"/>
+        </creator>
+    </xml>
+    <xml name="citations">
+        <citations>
+            <citation type="bibtex">
+                @misc{emg_toolkit,
+                    author = {EBI Metagenomics},
+                    title = {mgnify-pipelines-toolkit},
+                    year = {2024},
+                    howpublished = {\url{https://github.com/EBI-Metagenomics/mgnify-pipelines-toolkit}},
+                    note = {Accessed: 2024-11-05}
+                }
+            </citation>
+        </citations>
+    </xml>
+</macros>

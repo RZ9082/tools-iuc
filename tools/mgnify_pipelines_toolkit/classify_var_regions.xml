@@ -1,0 +1,150 @@
+<tool id="mgnify_pipelines_toolkit_classify_var_regions" name="Classify rRNA variable regions" version="@TOOL_VERSION@+galaxy@VERSION_SUFFIX@" profile="@PROFILE@">
+    <description>Identify amplified rRNA variable regions from CMsearch tblout results</description>
+    <macros>
+        <import>macros.xml</import>
+    </macros>
+    <expand macro="creators"/>
+    <expand macro="requirements"/>
+    <command detect_errors="aggressive"><![CDATA[
+        #set input_basename = str($input.name).rsplit('.',1)[0]
+        classify_var_regions -d ./ -o '$input_basename' '$input' $statistics &&
+        ls -l &&
+        #if $statistics
+            mv '$input_basename'.condensed_stats '$output_condensed_stats' &&
+            mv '$input_basename'.missing_files.txt '$output_missing_files' &&
+            mv '$input_basename'.seq_count.txt '$output_seq_count' &&
+            mv '$input_basename'.stats '$output_stats' &&
+        #end if
+        mv '$input_basename'.json '$output_json' &&
+        mv '$input_basename'_regions.txt '$output_regions' &&
+        mv '$input_basename'.tsv '$output_tabular' &&
+        mv '$input_basename'_all_coverages.txt '$output_coverages' &&
+        mkdir per_read &&
+        find ./ -maxdepth 1 -type f -name "*.txt" -exec mv {} per_read ';'
+    ]]></command>
+    <inputs>
+        <param name="input" type="data" label="CMsearch tblout results" format="tabular" help="Tabular output from Infernal CMsearch containing rRNA model matches"/>
+        <param argument="--statistics" type="boolean" label="Generate detailed statistics files" truevalue="--statistics" falsevalue="" help="Produce additional statistics describing region detection and filtering"/>
+    </inputs>    
+    <outputs>
+        <data name="output_json" label="${tool.name} on ${on_string}: Region classification JSON" format="json"/>
+        <data name="output_tabular" label="${tool.name} on ${on_string}: Amplified regions table" format="tabular"/>
+        <data name="output_regions" label="${tool.name} on ${on_string}: Detected regions list" format="txt"/>
+        <data name="output_coverages" label="${tool.name} on ${on_string}: Region coverage summary" format="txt"/>
+        <collection name="per_read_regions" type="list" label="${tool.name} on ${on_string}: Per-read region assignments" format="txt">
+            <discover_datasets format="txt" directory="per_read" pattern="__name_and_ext__"/>
+        </collection>
+        <data name="output_condensed_stats" label="${tool.name} on ${on_string}: Condensed statistics" format="tabular">
+            <filter>statistics</filter>
+        </data>
+        <data name="output_missing_files" label="${tool.name} on ${on_string}: Missing file log" format="txt">
+            <filter>statistics</filter>
+        </data>
+        <data name="output_seq_count" label="${tool.name} on ${on_string}: Sequence counts per region" format="txt">
+            <filter>statistics</filter>
+        </data>
+        <data name="output_stats" label="${tool.name} on ${on_string}: Detailed statistics" format="tabular">
+            <filter>statistics</filter>
+        </data>
+    </outputs>
+    <tests>
+        <test expect_num_outputs="9">
+            <param name="input" value="test_success_single.tblout.deoverlapped"/>
+            <param name="statistics" value="true"/>
+            <output name="output_json" ftype="json">
+                <assert_contents>
+                    <has_text text="dataset"/>
+                    <has_text text="Bacteria"/>
+                    <has_text text="V3-V4"/>
+                    <has_text text="1.0"/>
+                    <has_n_lines n="1"/>
+                </assert_contents>
+            </output>
+            <output name="output_tabular" ftype="tabular">
+                <assert_contents>
+                    <has_text text="16S"/>
+                    <has_text text="V3-V4"/>
+                    <has_text text="ECO_0000363"/>
+                    <has_n_columns n="5"/>
+                    <has_n_lines n="2"/>
+                </assert_contents>
+            </output>
+            <output name="output_regions" ftype="txt">
+                <assert_contents>
+                    <has_text text="16S.V3-V4"/>
+                    <has_n_lines n="1"/>
+                </assert_contents>
+            </output>
+            <output name="output_coverages" ftype="txt">
+                <assert_contents>
+                    <has_text text="Bacteria:V3: 1.0"/>
+                    <has_text text="Bacteria:V4: 1.0"/>
+                    <has_n_lines n="2"/>
+                </assert_contents>
+            </output>
+            <output_collection name="per_read_regions" type="list" count="1">
+                <element name="test_success_single.tblout.16S.V3-V4" ftype="txt">
+                    <assert_contents>
+                        <has_text text="ERR4822665"/>
+                        <has_n_lines n="6500"/>
+                    </assert_contents>
+                </element>
+            </output_collection>
+            <output name="output_condensed_stats" ftype="tabular">
+                <assert_contents>
+                    <has_n_columns n="5"/>
+                    <has_n_lines n="2"/>
+                </assert_contents>
+            </output>
+            <output name="output_seq_count" ftype="txt">
+                <assert_contents>
+                    <has_text text="Bacteria"/>
+                    <has_text text="V3-V4"/>
+                    <has_text text="6500"/>
+                    <has_n_lines n="1"/>
+                </assert_contents>
+            </output>
+            <output name="output_stats" ftype="tabular">
+                <assert_contents>
+                    <has_text text="Regions bact"/>
+                    <has_text text="V3-V4"/>
+                    <has_n_columns n="16"/>
+                    <has_n_lines n="2"/>
+                </assert_contents>
+            </output>
+        </test>
+    </tests>
+    <help>
+<![CDATA[
+
+**Classify rRNA Variable Regions**
+----------------------------------
+
+This tool identifies which **ribosomal RNA variable regions** were amplified in a sequencing run.
+
+It analyzes **Infernal CMsearch tblout results** and determines the variable regions represented in the dataset by comparing sequence coordinates against known rRNA reference models.
+
+-----
+
+Supported marker genes
+----------------------
+
+The tool automatically detects the rRNA marker gene and domain from the covariance model:
+
++----------+-------------+-------------+
+| Model    | Domain      | Marker gene |
++==========+=============+=============+
+| RF00177  | Bacteria    | 16S         |
++----------+-------------+-------------+
+| RF01959  | Archaea     | 16S         |
++----------+-------------+-------------+
+| RF01960  | Eukaryotes  | 18S         |
++----------+-------------+-------------+
+
+-----
+
+@LICENSE@
+]]>
+    </help>
+    <expand macro="citations" />
+</tool>
