@@ -28,7 +28,6 @@
     </xml>
     <xml name="edam">
         <edam_topics>
-            <edam_topic>topic_0091</edam_topic>
             <edam_topic>topic_3365</edam_topic>
         </edam_topics>
         <edam_operations>
