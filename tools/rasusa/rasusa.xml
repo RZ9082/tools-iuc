@@ -39,6 +39,10 @@
                     <param argument="--frac" type="float" value="0.1" min="0" max="1"/>
                 </when>
             </conditional>
+            <param name="output_format" type="select" label="Select desired output format">
+                <option value="fastq">Sanger FASTQ</option>
+                <option value="fasta">FASTA</option>
+            </param>
         </xml>
         <token name="@FASTQ_SUBSAMPLE_OPTIONS@"><![CDATA[
 #if str( $subsample.type ) == "coverage":
@@ -52,7 +56,7 @@
 --frac $subsample.frac
 #end if
 #if $r1_ext.endswith(".gz") or $r2_ext.endswith(".gz")
---output-type g
+--compress-type g
 #end if    ]]>
     </token>
     </macros>
@@ -65,51 +69,57 @@
     </requirements>
 
     <command detect_errors="exit_code"><![CDATA[
-#if str( $input.input_selector ) == "aligned":
-ln -s '$bam' 'input.bam' &&
-ln -s '$bam.metadata.bam_index' 'input.bam.bai' &&
-rasusa aln
---coverage $input.coverage
---step-size $input.step_size
+#if str($input.input_selector) == "aligned":
+    #if '$aligned_input.ext' == "bam":
+        ln -s '$aligned_input.metadata.bam_index' 'input.bam.bai' &&
+    #end if
+    ln -s '$aligned_input' input.$aligned_input.ext &&
+    rasusa aln
+    --coverage $input.coverage
+    --step-size $input.step_size
 #else:
-rasusa reads
+    rasusa reads
 #end if
 
 #if $seed
--s $seed
+    -s $seed
 #end if
 
-#if str( $input.input_selector ) == "paired":
+#if str($input.input_selector) == "paired":
     #set r1_ext = $input.reads1.extension
     #set r2_ext = $input.reads2.extension
--o 'paired_out1.$r1_ext'
--o 'paired_out2.$r2_ext'
-@FASTQ_SUBSAMPLE_OPTIONS@
-'${input.reads1}'
-'${input.reads2}' &&
-mv 'paired_out1.$r1_ext' '$paired_output1' &&
-mv 'paired_out2.$r2_ext' '$paired_output2'
+    -o 'paired_out1.$r1_ext'
+    -o 'paired_out2.$r2_ext'
+    @FASTQ_SUBSAMPLE_OPTIONS@
+    '${input.reads1}'
+    '${input.reads2}' &&
+    mv 'paired_out1.$r1_ext' '$paired_output1' &&
+    mv 'paired_out2.$r2_ext' '$paired_output2'
 
-#elif str( $input.input_selector ) == "paired_collection":
+#elif str($input.input_selector) == "paired_collection":
     #set r1_ext = $input.collection.forward.extension
     #set r2_ext = $input.collection.reverse.extension
--o 'paired_out1.$r1_ext'
--o 'paired_out2.$r2_ext'
-@FASTQ_SUBSAMPLE_OPTIONS@
-'${input.collection.forward}'
-'${input.collection.reverse}' &&
-mv 'paired_out1.$r1_ext' '${collection_output.forward}' &&
-mv 'paired_out2.$r2_ext' '${collection_output.reverse}'
+    -o 'paired_out1.$r1_ext'
+    -o 'paired_out2.$r2_ext'
+    @FASTQ_SUBSAMPLE_OPTIONS@
+    '${input.collection.forward}'
+    '${input.collection.reverse}' &&
+    mv 'paired_out1.$r1_ext' '${collection_output.forward}' &&
+    mv 'paired_out2.$r2_ext' '${collection_output.reverse}'
 
-#elif str( $input.input_selector ) == "single":
+#elif str($input.input_selector) == "single":
     #set r1_ext = $input.reads.extension
--o 'single_out.$r1_ext'
-@FASTQ_SUBSAMPLE_OPTIONS@
-'${input.reads}' &&
-mv 'single_out.$r1_ext' '$single_output'
+    -o 'single_out.$r1_ext'
+    @FASTQ_SUBSAMPLE_OPTIONS@
+    '${input.reads}' &&
+    mv 'single_out.$r1_ext' '$single_output'
 
-#elif str( $input.input_selector ) == "aligned":
-'input.bam' | samtools sort --no-PG -@ 1 -T '\${TMPDIR:-.}' -O bam -o '$bam_output' -
+#elif str($input.input_selector) == "aligned":
+    #if str($input.aligned_output_format) == "bam":
+        --output-format bam 'input.$aligned_input.ext' | samtools sort --no-PG -@ 1 -T '\${TMPDIR:-.}' -O bam -o '$bam_output' -
+    #elif str($input.aligned_output_format) == "sam":
+        --output-format sam 'input.$aligned_input.ext' | samtools sort --no-PG -@ 1 -T '\${TMPDIR:-.}' -O sam -o '$sam_output' -
+    #end if
 #end if
     ]]></command>
     <inputs>
@@ -118,7 +128,7 @@ mv 'single_out.$r1_ext' '$single_output'
                 <option value="paired">Paired-end FASTQ</option>
                 <option value="single">Single-end FASTQ</option>
                 <option value="paired_collection">Paired FASTQ Collection</option>
-                <option value="aligned">BAM file of aligned reads</option>
+                <option value="aligned">BAM/SAM file of aligned reads</option>
             </param>
             <when value="paired">
                 <param name="reads1" type="data" format="@FORMATS@" label="Select first set of reads" help="Specify dataset with forward reads"/>
@@ -134,10 +144,14 @@ mv 'single_out.$r1_ext' '$single_output'
                 <expand macro="params_fastq" />
             </when>
             <when value="aligned">
-                <param name="bam" format="sam,bam" type="data" label="Select BAM file(s) with alignments"/>
+                <param name="aligned_input" format="sam,bam" type="data" label="Select BAM/SAM file with alignments"/>
                 <param argument="--coverage" type="integer" min="0" optional="true" value="" label="The desired depth of coverage to subsample the alignment to"/>
                 <param type="integer" argument="--step-size" value="100" label="When a region has less than the desired coverage, the step size to move along the chromosome to find more reads."
                     help="The lowest of the step and the minimum end coordinate of the reads in the region will be used. This parameter can have a significant impact on the runtime of the subsampling process."/>
+                <param type="select" name="aligned_output_format" label="Select desired output format">
+                    <option value="bam" selected="true">BAM</option>
+                    <option value="sam">SAM</option>
+                </param>
             </when>
         </conditional>
         <param type="integer" argument="--seed" optional="true" label="Random seed to use"/>
@@ -158,7 +172,10 @@ mv 'single_out.$r1_ext' '$single_output'
             <data name="reverse" label="${tool.name} on ${input.collection.reverse.name}: paired-end R2" format_source="collection['reverse']"/>
         </collection>
         <data name="bam_output" label="${tool.name} on ${on_string}: BAM" format="bam">
-            <filter>input['input_selector'] == 'aligned'</filter>
+            <filter>input['input_selector'] == 'aligned' and input['aligned_output_format'] == 'bam'</filter>
+        </data>
+        <data name="sam_output" label="${tool.name} on ${on_string}: SAM" format="sam">
+            <filter>input['input_selector'] == 'aligned' and input['aligned_output_format'] == 'sam'</filter>
         </data>
     </outputs>
     <tests>
@@ -167,12 +184,12 @@ mv 'single_out.$r1_ext' '$single_output'
             <conditional name="input">
                 <param name="input_selector" value="single"/>
                 <param name="reads" value="r1.fastq.gz"/>
-            </conditional>
-            <conditional name="subsample">
-                <param name="type" value="coverage"/>
-                <param name="genome_size_unit" value="b"/>
-                <param name="genome_size" value="1000"/>
-                <param name="coverage" value="1"/>
+                <conditional name="subsample">
+                    <param name="type" value="coverage"/>
+                    <param name="genome_size_unit" value="b"/>
+                    <param name="genome_size" value="1000"/>
+                    <param name="coverage" value="1"/>
+                </conditional>
             </conditional>
             <param name="seed" value="1"/>
             <output name="single_output" value="single_by_coverage_b.fastq.gz" ftype="fastqsanger.gz"/>
@@ -183,12 +200,12 @@ mv 'single_out.$r1_ext' '$single_output'
                 <param name="input_selector" value="paired"/>
                 <param name="reads1" value="r1.fastq.gz"/>
                 <param name="reads2" value="r2.fastq.gz"/>
-            </conditional>
-            <conditional name="subsample">
-                <param name="type" value="coverage"/>
-                <param name="genome_size_unit" value="k"/>
-                <param name="genome_size" value="1"/>
-                <param name="coverage" value="1"/>
+                <conditional name="subsample">
+                    <param name="type" value="coverage"/>
+                    <param name="genome_size_unit" value="k"/>
+                    <param name="genome_size" value="1"/>
+                    <param name="coverage" value="1"/>
+                </conditional>
             </conditional>
             <param name="seed" value="1"/>
             <output name="paired_output1" value="paired1_by_coverage_k.fastq.gz" ftype="fastqsanger.gz"/>
@@ -204,12 +221,12 @@ mv 'single_out.$r1_ext' '$single_output'
                         <element name="reverse" value="r2.fastq.gz"/>
                     </collection>
                 </param>
-            </conditional>
-            <conditional name="subsample">
-                <param name="type" value="coverage"/>
-                <param name="genome_size_unit" value="m"/>
-                <param name="genome_size" value="0.001"/>
-                <param name="coverage" value="1"/>
+                <conditional name="subsample">
+                    <param name="type" value="coverage"/>
+                    <param name="genome_size_unit" value="m"/>
+                    <param name="genome_size" value="0.001"/>
+                    <param name="coverage" value="1"/>
+                </conditional>
             </conditional>
             <param name="seed" value="1"/>
             <output_collection name="collection_output" type="paired">
@@ -222,12 +239,12 @@ mv 'single_out.$r1_ext' '$single_output'
             <conditional name="input">
                 <param name="input_selector" value="single"/>
                 <param name="reads" value="r1.fasta.gz"/>
-            </conditional>
-            <conditional name="subsample">
-                <param name="type" value="coverage"/>
-                <param name="genome_size_unit" value="g"/>
-                <param name="genome_size" value="0.001"/>
-                <param name="coverage" value="0.001"/>
+                <conditional name="subsample">
+                    <param name="type" value="coverage"/>
+                    <param name="genome_size_unit" value="g"/>
+                    <param name="genome_size" value="0.001"/>
+                    <param name="coverage" value="0.001"/>
+                </conditional>
             </conditional>
             <param name="seed" value="1"/>
             <output name="single_output" value="single_end_by_coverage_g.fasta" ftype="fasta.gz"/>
@@ -238,11 +255,11 @@ mv 'single_out.$r1_ext' '$single_output'
                 <param name="input_selector" value="paired"/>
                 <param name="reads1" value="r1.fastq"/>
                 <param name="reads2" value="r2.fastq"/>
-            </conditional>
-            <conditional name="subsample">
-                <param name="type" value="num_bases"/>
-                <param name="num_bases_unit" value="k"/>
-                <param name="bases" value="2"/>
+                <conditional name="subsample">
+                    <param name="type" value="num_bases"/>
+                    <param name="num_bases_unit" value="k"/>
+                    <param name="bases" value="2"/>
+                </conditional>
             </conditional>
             <param name="seed" value="1"/>
             <output name="paired_output1" value="paired1_by_num_bases_k.fastq" ftype="fastqsanger"/>
@@ -254,10 +271,10 @@ mv 'single_out.$r1_ext' '$single_output'
                 <param name="input_selector" value="paired"/>
                 <param name="reads1" value="r1.fasta.gz"/>
                 <param name="reads2" value="r2.fasta.gz"/>
-            </conditional>
-            <conditional name="subsample">
-                <param name="type" value="num_reads"/>
-                <param name="num" value="5"/>
+                <conditional name="subsample">
+                    <param name="type" value="num_reads"/>
+                    <param name="num" value="5"/>
+                </conditional>
             </conditional>
             <param name="seed" value="1"/>
             <output name="paired_output1" value="paired1_by_num_reads.fasta.gz" ftype="fasta.gz"/>
@@ -273,10 +290,10 @@ mv 'single_out.$r1_ext' '$single_output'
                         <element name="reverse" value="r2.fasta"/>
                     </collection>
                 </param>
-            </conditional>
-            <conditional name="subsample">
-                <param name="type" value="frac_reads"/>
-                <param name="frac" value="0.6"/>
+                <conditional name="subsample">
+                    <param name="type" value="frac_reads"/>
+                    <param name="frac" value="0.6"/>
+                </conditional>
             </conditional>
             <param name="seed" value="1"/>
             <output_collection name="collection_output" type="paired">
@@ -288,9 +305,9 @@ mv 'single_out.$r1_ext' '$single_output'
             <!-- test 8: bam input -->
             <conditional name="input">
                 <param name="input_selector" value="aligned"/>
-                <param name="bam" value="input.bam" />
+                <param name="aligned_input" value="input.bam" />
+                <param name="coverage" value="1"/>
             </conditional>
-            <param name="coverage" value="1"/>
             <param name="seed" value="1"/>
             <output name="bam_output" value="output.bam" ftype="bam"/>
         </test>
