@@ -40,10 +40,6 @@
                     <param argument="--frac" type="float" value="0.1" min="0" max="1"/>
                 </when>
             </conditional>
-            <param name="output_format" type="select" label="Select desired output format">
-                <option value="fastq">Sanger FASTQ</option>
-                <option value="fasta">FASTA</option>
-            </param>
         </xml>
         <token name="@FASTQ_SUBSAMPLE_OPTIONS@"><![CDATA[
 #if str( $subsample.type ) == "coverage":
@@ -303,7 +299,7 @@
             </output_collection>
         </test>
         <test expect_num_outputs="1">
-            <!-- test 8: bam input -->
+            <!-- test 8: bam input, bam output -->
             <conditional name="input">
                 <param name="input_selector" value="aligned"/>
                 <param name="aligned_input" value="input.bam" />
@@ -311,6 +307,17 @@
             </conditional>
             <param name="seed" value="1"/>
             <output name="bam_output" value="output.bam" ftype="bam"/>
+        </test>
+        <test expect_num_outputs="1">
+            <!-- test 9: bam input, sam output -->
+            <conditional name="input">
+                <param name="input_selector" value="aligned"/>
+                <param name="aligned_input" value="input.bam" />
+                <param name="coverage" value="1"/>
+                <param name="aligned_output_format" value="sam"/>
+            </conditional>
+            <param name="seed" value="1"/>
+            <output name="bam_output" value="output.sam" ftype="sam"/>
         </test>
     </tests>
     <help><![CDATA[
