@@ -121,7 +121,7 @@
                 <option value="paired">Paired-end FASTQ</option>
                 <option value="single">Single-end FASTQ</option>
                 <option value="paired_collection">Paired FASTQ Collection</option>
-                <option value="aligned">BAM/SAM file of aligned reads</option>
+                <option value="aligned">BAM file of aligned reads</option>
             </param>
             <when value="paired">
                 <param name="reads1" type="data" format="@FORMATS@" label="Select first set of reads" help="Specify dataset with forward reads"/>
@@ -137,7 +137,7 @@
                 <expand macro="params_fastq" />
             </when>
             <when value="aligned">
-                <param name="aligned_input" format="sam,bam" type="data" label="Select BAM/SAM file with alignments"/>
+                <param name="aligned_input" format="bam" type="data" label="Select BAM file with alignments"/>
                 <param argument="--coverage" type="integer" min="0" optional="true" value="" label="The desired depth of coverage to subsample the alignment to"/>
                 <param type="integer" argument="--step-size" value="100" label="When a region has less than the desired coverage, the step size to move along the chromosome to find more reads."
                     help="The lowest of the step and the minimum end coordinate of the reads in the region will be used. This parameter can have a significant impact on the runtime of the subsampling process."/>
