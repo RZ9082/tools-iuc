@@ -112,11 +112,7 @@
     mv 'single_out.$r1_ext' '$single_output'
 
 #elif str($input.input_selector) == "aligned":
-    #if str($input.aligned_output_format) == "bam":
-        --output-format bam 'input.$aligned_input.ext' | samtools sort --no-PG -@ 1 -T '\${TMPDIR:-.}' -O bam -o '$bam_output' -
-    #elif str($input.aligned_output_format) == "sam":
-        --output-format sam 'input.$aligned_input.ext' | samtools sort --no-PG -@ 1 -T '\${TMPDIR:-.}' -O sam -o '$sam_output' -
-    #end if
+    --output-format bam 'input.$aligned_input.ext' | samtools sort --no-PG -@ 1 -T '\${TMPDIR:-.}' -O bam -o '$bam_output' -
 #end if
     ]]></command>
     <inputs>
@@ -145,10 +141,6 @@
                 <param argument="--coverage" type="integer" min="0" optional="true" value="" label="The desired depth of coverage to subsample the alignment to"/>
                 <param type="integer" argument="--step-size" value="100" label="When a region has less than the desired coverage, the step size to move along the chromosome to find more reads."
                     help="The lowest of the step and the minimum end coordinate of the reads in the region will be used. This parameter can have a significant impact on the runtime of the subsampling process."/>
-                <param type="select" name="aligned_output_format" label="Select desired output format">
-                    <option value="bam" selected="true">BAM</option>
-                    <option value="sam">SAM</option>
-                </param>
             </when>
         </conditional>
         <param type="integer" argument="--seed" optional="true" label="Random seed to use"/>
@@ -169,10 +161,7 @@
             <data name="reverse" label="${tool.name} on ${input.collection.reverse.name}: paired-end R2" format_source="collection['reverse']"/>
         </collection>
         <data name="bam_output" label="${tool.name} on ${on_string}: BAM" format="bam">
-            <filter>input['input_selector'] == 'aligned' and input['aligned_output_format'] == 'bam'</filter>
-        </data>
-        <data name="sam_output" label="${tool.name} on ${on_string}: SAM" format="sam">
-            <filter>input['input_selector'] == 'aligned' and input['aligned_output_format'] == 'sam'</filter>
+            <filter>input['input_selector'] == 'aligned'</filter>
         </data>
     </outputs>
     <tests>
@@ -307,17 +296,6 @@
             </conditional>
             <param name="seed" value="1"/>
             <output name="bam_output" value="output.bam" ftype="bam"/>
-        </test>
-        <test expect_num_outputs="1">
-            <!-- test 9: bam input, sam output -->
-            <conditional name="input">
-                <param name="input_selector" value="aligned"/>
-                <param name="aligned_input" value="input.bam" />
-                <param name="coverage" value="1"/>
-                <param name="aligned_output_format" value="sam"/>
-            </conditional>
-            <param name="seed" value="1"/>
-            <output name="bam_output" value="output.sam" ftype="sam"/>
         </test>
     </tests>
     <help><![CDATA[
