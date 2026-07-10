@@ -232,7 +232,7 @@ $filters.exclude_atypical
                 <param name="include" value="genome"/>
                 <param name="decompress" value="true"/>
             </section>
-            <output_collection name="genome_fasta" type="list:list" count="9">
+            <output_collection name="genome_fasta" type="list:list" count="11">
                 <expand macro="genome_fasta_assert" el1="GCA_000001895.4" el2="chrMT" expression="&gt;"/>
                 <expand macro="genome_fasta_assert" el1="GCA_015227675.2" el2="chrMT" expression="&gt;"/>
                 <expand macro="genome_fasta_assert" el1="GCA_036323735.1" el2="chrMT" expression="&gt;"/>
@@ -240,6 +240,8 @@ $filters.exclude_atypical
                 <expand macro="genome_fasta_assert" el1="GCA_045687965.1" el2="chrMT" expression="&gt;"/>
                 <expand macro="genome_fasta_assert" el1="GCA_045687995.1" el2="chrMT" expression="&gt;"/>
                 <expand macro="genome_fasta_assert" el1="GCA_045688005.1" el2="chrMT" expression="&gt;"/>
+                <expand macro="genome_fasta_assert" el1="GCA_058775205.1" el2="chrMT" expression="&gt;"/>
+                <expand macro="genome_fasta_assert" el1="GCA_058775275.1" el2="chrMT" expression="&gt;"/>
                 <expand macro="genome_fasta_assert" el1="GCF_000001895.5" el2="chrMT" expression="&gt;"/>
                 <expand macro="genome_fasta_assert" el1="GCF_015227675.2" el2="chrMT" expression="&gt;"/>
                 <!-- According to  https://github.com/ncbi/datasets/issues/188, the following should not be included among the returned results anymore 09/2023 -->
