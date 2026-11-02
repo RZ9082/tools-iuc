@@ -68,6 +68,40 @@ filt.rev <- NULL
     filt.fwd <- c(filt.fwd, '$output_single')
 #end if
 
+#if str($autotrim_cond.auto_truncLen) == "auto"
+    library(ShortRead, quietly=T)
+    trunc_len_automation <- function(fastq_path, n=$autotrim_cond.qa_sample_size, reads_remainder_threshold=$autotrim_cond.min_read_fraction) {
+        srqa <- qa(fastq_path, n=n)
+        df <- srqa[["perCycle"]][["quality"]]
+        total_read_count <- srqa[["readCounts"]][["read"]]
+        counts_per_cycle <- rowsum(df[["Count"]], df[["Cycle"]])
+        skip <- min(99, max(0, length(counts_per_cycle) - 10))
+        means <- tail(rowsum(df[["Score"]] * df[["Count"]], df[["Cycle"]]) / rowsum(df[["Count"]], df[["Cycle"]]), length(counts_per_cycle) - skip)
+        filtered_counts_per_cycle <- tail(counts_per_cycle, length(counts_per_cycle) - skip)
+        q_score_list <- 20:30
+        final_where_to_cut <- 0
+        for (q in q_score_list) {
+            idx <- which(means < q)
+            if (length(idx) > 0) {
+                less_than_q <- min(idx) - 1
+                if (less_than_q > 0 && less_than_q < length(filtered_counts_per_cycle)) {
+                    reads_remainder <- filtered_counts_per_cycle[less_than_q] / total_read_count
+                    if (reads_remainder >= reads_remainder_threshold) {
+                        final_where_to_cut <- less_than_q
+                        break
+                    }
+                }
+            }
+        }
+        if (final_where_to_cut == 0) return(0)
+        return(as.integer(rownames(filtered_counts_per_cycle)[final_where_to_cut]))
+    }
+    truncLen[1] <- trunc_len_automation(fwd)
+    #if $paired_cond.paired_select == "paired"
+        truncLen[2] <- trunc_len_automation(rev)
+    #end if
+#end if
+
 #if str($orientFwd) == ""
     orientFwd <- NULL
 #else
@@ -84,6 +118,13 @@ ftout <- filterAndTrim(fwd, filt.fwd, rev, filt.rev,  compress = $compress_outpu
 rownames(ftout) <- c( '$paired_cond.reads.element_identifier' )
 write.table(ftout, "$outtab", quote=F, sep="\t", col.names=NA)
 
+#if $output_trunc_lengths
+writeLines(as.character(truncLen[1]), "$trunc_fwd")
+#if $paired_cond.paired_select == "paired"
+writeLines(as.character(truncLen[2]), "$trunc_rev")
+#end if
+#end if
+
 if(0 %in% ftout){
     quit(save="no", status="1")
 }
@@ -93,6 +134,19 @@ if(0 %in% ftout){
     <inputs>
         <expand macro="fastq_input" multiple="False" collection_type="paired" argument_fwd="fwd" argument_rev="rev"/>
         <expand macro="trimmers"/>
+        <conditional name="autotrim_cond">
+            <param name="auto_truncLen" type="select" label="Truncation length mode">
+                <option value="manual" selected="true">Manual (static length from Trimming parameters)</option>
+                <option value="auto">Automated (quality-decay estimation)</option>
+            </param>
+            <when value="manual"/>
+            <when value="auto">
+                <param name="qa_sample_size" type="integer" value="500000" min="1000" label="Number of reads to sample for QA"
+                       help="Read sampling limit for quality inspection (default: 500,000)"/>
+                <param name="min_read_fraction" type="float" value="0.5" min="0.1" max="1.0" label="Minimum read retention fraction"
+                       help="Fraction of reads that must be retained at the chosen truncation point (default: 0.5 = 50%)"/>
+            </when>
+        </conditional>
         <expand macro="filters"/>
         <conditional name="seprev_cond">
             <param name="seprev_select" type="select" label="Separate filters and trimmers for reverse reads" help="only applies to paired end data">
@@ -109,6 +163,7 @@ if(0 %in% ftout){
         <param name="rmlowcomplex" argument="rm.lowcomplex" type="integer" value="0" min="0" label="Low complexity filter kmer threshold" help="see below"/>
         <param name="orientFwd" argument="orient.fwd" type="text" value="" optional="true" label="String present at the start of valid reads" help="see below"/>
         <param name="output_statistics" truevalue="TRUE" falsevalue="FALSE" type="boolean" checked="true" label="Output statistics" help="Create extra table with the number of reads pre and post filtering" />
+        <param name="output_trunc_lengths" truevalue="TRUE" falsevalue="FALSE" type="boolean" checked="false" label="Output applied truncation length(s)" help="Create tabular dataset(s) containing the truncation length actually applied (useful for tracking or downstream reporting tools)" />
     </inputs>
     <outputs>
         <collection name="paired_output" type="paired" format_source="paired_cond|reads" label="${tool.name} on ${on_string}: Paired reads" >
@@ -119,6 +174,12 @@ if(0 %in% ftout){
         </data>
         <data name="outtab" format="tabular" label="${tool.name} on ${on_string}: Statistics">
             <filter>output_statistics</filter>
+        </data>
+        <data name="trunc_fwd" format="tabular" label="${tool.name} on ${on_string}: Forward truncation length">
+            <filter>output_trunc_lengths</filter>
+        </data>
+        <data name="trunc_rev" format="tabular" label="${tool.name} on ${on_string}: Reverse truncation length">
+            <filter>output_trunc_lengths and paired_cond['paired_select'] == 'paired'</filter>
         </data>
     </outputs>
     <tests>
@@ -246,6 +307,64 @@ if(0 %in% ftout){
             <param name="output_statistics" value="FALSE" />
         </test>
 
+        <!-- paired data with automated truncation length and output_trunc_lengths -->
+        <test expect_num_outputs="6">
+            <conditional name="paired_cond">
+                <param name="paired_select" value="paired"/>
+                <param name="reads">
+                    <collection type="paired">
+                        <element name="forward" value="F3D0_S188_L001_R1_001.fastq.gz" ftype="fastqsanger.gz"/>
+                        <element name="reverse" value="F3D0_S188_L001_R2_001.fastq.gz" ftype="fastqsanger.gz"/>
+                    </collection>
+                </param>
+            </conditional>
+            <conditional name="autotrim_cond">
+                <param name="auto_truncLen" value="auto"/>
+            </conditional>
+            <param name="output_trunc_lengths" value="TRUE"/>
+            <output_collection name="paired_output" type="paired" count="2"/>
+            <output name="outtab">
+                <assert_contents>
+                    <has_text text="750"/>
+                    <has_text text="714"/>
+                </assert_contents>
+            </output>
+            <output name="trunc_fwd">
+                <assert_contents>
+                    <has_line line="250"/>
+                </assert_contents>
+            </output>
+            <output name="trunc_rev">
+                <assert_contents>
+                    <has_line line="250"/>
+                </assert_contents>
+            </output>
+        </test>
+
+        <!-- single-end data with automated truncation length and output_trunc_lengths -->
+        <test expect_num_outputs="3">
+            <conditional name="paired_cond">
+                <param name="paired_select" value="single"/>
+                <param name="reads" value="F3D0_S188_L001_R1_001.fastq.gz" ftype="fastqsanger.gz"/>
+            </conditional>
+            <conditional name="autotrim_cond">
+                <param name="auto_truncLen" value="auto"/>
+            </conditional>
+            <param name="output_trunc_lengths" value="TRUE"/>
+            <output name="output_single" ftype="fastqsanger.gz"/>
+            <output name="outtab">
+                <assert_contents>
+                    <has_text text="750"/>
+                    <has_text text="746"/>
+                </assert_contents>
+            </output>
+            <output name="trunc_fwd">
+                <assert_contents>
+                    <has_line line="250"/>
+                </assert_contents>
+            </output>
+        </test>
+
     </tests>
 
     <help><![CDATA[
@@ -273,6 +392,11 @@ Details
 - Truncation of the read length is enforced after trimming of the right end.
 - The long read filter is applied before trimming and the short read filter after trimming.
 - For details on the calculation of the number of expected errors see also Calahan et al. 2016
+
+*Automated Truncation Length Estimation*:
+
+When ``Truncation length mode`` is set to ``Automated (quality-decay estimation)``, the tool samples reads (using ShortRead QA) and dynamically computes the optimal truncation cutoff per strand where the average quality score drops below the quality threshold while retaining at least the requested fraction of reads (default 50%).
+When ``Output applied truncation length(s)`` is enabled, the computed truncation cutoffs are emitted as tabular outputs for provenance and downstream reporting (e.g. read-to-ASV mapping and stats summaries).
 
 *String present at the start of valid reads* (orient.fwd):
 
