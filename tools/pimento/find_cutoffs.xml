@@ -6,7 +6,14 @@
     <expand macro="creators"/>
     <expand macro="requirements"/>
     <command detect_errors="aggressive"><![CDATA[
-        pimento find_cutoffs -i '$input_bcv' -o sample
+        ## Empty BCV input (e.g. a run with no 'auto' primer-trimming flags):
+        ## touch an empty output instead of running, as the pipeline's
+        ## FIND_PRIMER_CUTOFFS does with its `if [[ -s ]]` guard.
+        if [ -s '$input_bcv' ]; then
+            pimento find_cutoffs -i '$input_bcv' -o sample;
+        else
+            touch sample_cutoffs.tsv;
+        fi
     ]]></command>
     <inputs>
         <param name="input_bcv" type="data" label="BCV input file" format="tsv"/>
@@ -25,6 +32,14 @@
                     <has_text text="14"/>
                     <has_n_lines n="3"/>
                     <has_n_columns n="2"/>
+                </assert_contents>
+            </output>
+        </test>
+        <test expect_num_outputs="1">
+            <param name="input_bcv" value="empty.tsv"/>
+            <output name="output">
+                <assert_contents>
+                    <has_n_lines n="0"/>
                 </assert_contents>
             </output>
         </test>

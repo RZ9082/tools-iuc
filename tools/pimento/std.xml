@@ -6,20 +6,31 @@
     <expand macro="creators"/>
     <expand macro="requirements"/>
     <command detect_errors="aggressive"><![CDATA[
-        #if $primers:
+        #if $primers
             mkdir primers &&
-            cp '$primers' primers &&
-            pimento std -i '$input_reads' -p primers --minimum_primer_threshold $minimum_primer_threshold $merged -o sample --threads "\${GALAXY_SLOTS:-1}"
+            #for $primer in $primers
+                #if $primer
+                    if [ -s '$primer' ] && head -n 1 '$primer' | grep -q '^>'; then
+                        ln -s '$primer' primers/'$primer.element_identifier';
+                    fi &&
+                #end if
+            #end for
+            if [ -n "\$(ls -A primers 2>/dev/null)" ]; then
+                pimento std -i '$input_reads' -p primers --minimum_primer_threshold $minimum_primer_threshold $merged -o sample -t "\${GALAXY_SLOTS:-1}";
+            else
+                pimento std -i '$input_reads' --minimum_primer_threshold $minimum_primer_threshold $merged -o sample -t "\${GALAXY_SLOTS:-1}";
+            fi
         #else
-            pimento std -i '$input_reads' --minimum_primer_threshold $minimum_primer_threshold $merged -o sample --threads "\${GALAXY_SLOTS:-1}"
+            pimento std -i '$input_reads' --minimum_primer_threshold $minimum_primer_threshold $merged -o sample -t "\${GALAXY_SLOTS:-1}"
         #end if
     ]]></command>
     <inputs>
         <param name="input_reads" type="data" label="Input reads" format="fastqsanger.gz"/>
-        <param name="primers" type="data" label="Input standard primers" format="fasta" optional="true"/>
+        <param name="primers" type="data" label="Input standard primers" format="fasta" multiple="true" optional="true"
+               help="Leave unset to use PIMENTO's built-in standard primer library (what the MGnify amplicon pipeline does by default)"/>
         <param argument="--minimum_primer_threshold" type="float" value="0.6" min="0.1" max="1.0" label="Minimum primer threshold" help="Any primers with a read proportion lower than this threshold are disregarded"/>
         <param argument="--merged" type="boolean" truevalue="--merged" falsevalue="" help="Necessary if the input sequence file is made up of merged paired-end or single-end reads"/>
-    </inputs>    
+    </inputs>
     <outputs>
         <data name="fasta_output" label="${tool.name} on ${on_string}: FASTA containing best found single or pairs of primers" format="fasta" from_work_dir="sample_std_primers.fasta"/>
         <data name="best_found_primers" label="${tool.name} on ${on_string}: Best found primers" format="txt" from_work_dir="sample_std_primer_out.txt"/>

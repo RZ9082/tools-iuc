@@ -6,16 +6,33 @@
     <expand macro="creators"/>
     <expand macro="requirements"/>
     <command detect_errors="aggressive"><![CDATA[
-        pimento gen_bcv -i '$input_fastq' -st $strand -o sample
+        #if $strand_flags
+            ## Derive the strand(s) from a trimming-conductor flags file
+            ## (2 lines: forward flag, reverse flag; each one of none/std/auto -
+            ## the MGnify amplicon pipeline's PRIMER_IDENTIFICATION output).
+            ## Only strands flagged 'auto' get a BCV, as in the pipeline's
+            ## PIMENTO_GENERATEBCV; if neither is 'auto' an empty file is
+            ## produced (the pipeline touches an empty <prefix>_mcp_cons.tsv).
+            fwd_flag=\$(sed -n 1p '$strand_flags') &&
+            rev_flag=\$(sed -n 2p '$strand_flags') &&
+            if [ "\$fwd_flag" = 'auto' ] && [ "\$rev_flag" = 'auto' ]; then strand='FR'; elif [ "\$fwd_flag" = 'auto' ]; then strand='F'; elif [ "\$rev_flag" = 'auto' ]; then strand='R'; else strand=''; fi &&
+            if [ -z "\$strand" ]; then touch sample_bcv.tsv; else pimento gen_bcv -i '$input_fastq' -st "\$strand" -o sample; fi
+        #else
+            pimento gen_bcv -i '$input_fastq' -st $strand -o sample
+        #end if
     ]]></command>
     <inputs>
         <param name="input_fastq" type="data" label="Input reads to generate the BCV for" format="fastqsanger.gz"/>
-        <param name="strand" type="select" label="The strand(s) to generate a BCV for">
+        <param name="strand" type="select" label="The strand(s) to generate a BCV for"
+               help="Ignored when a trimming-conductor flags file is provided below">
             <option value="F">Forward</option>
             <option value="R">Reverse</option>
             <option value="FR">Forward and reverse</option>
         </param>
-    </inputs>    
+        <param name="strand_flags" type="data" optional="true" format="txt"
+               label="Trimming-conductor flags file (optional)"
+               help="2-line file with the forward and reverse primer-trimming flags (none/std/auto) as produced by the MGnify amplicon pipeline's primer identification; only strands flagged 'auto' get a base-conservation vector, and an empty output is produced when neither is 'auto'"/>
+    </inputs>
     <outputs>
         <data name="output" label="${tool.name} on ${on_string}: Base-conservation vector(s)" format="tsv" from_work_dir="sample_bcv.tsv"/>
     </outputs>
@@ -31,6 +48,29 @@
                     <has_text text="0.7263999999999999"/>
                     <has_n_columns n="24"/>
                     <has_n_lines n="3"/>
+                </assert_contents>
+            </output>
+        </test>
+        <test expect_num_outputs="1">
+            <param name="input_fastq" value="test.fastq.gz"/>
+            <param name="strand_flags" value="ERR4334351_flags_auto_auto.txt"/>
+            <output name="output">
+                <assert_contents>
+                    <has_text text="F"/>
+                    <has_text text="0.9583999999999999"/>
+                    <has_text text="R"/>
+                    <has_text text="0.7263999999999999"/>
+                    <has_n_columns n="24"/>
+                    <has_n_lines n="3"/>
+                </assert_contents>
+            </output>
+        </test>
+        <test expect_num_outputs="1">
+            <param name="input_fastq" value="test.fastq.gz"/>
+            <param name="strand_flags" value="ERR4334351_flags_std_std.txt"/>
+            <output name="output">
+                <assert_contents>
+                    <has_n_lines n="0"/>
                 </assert_contents>
             </output>
         </test>
